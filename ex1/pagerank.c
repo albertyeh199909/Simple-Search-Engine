@@ -1,0 +1,237 @@
+#include <math.h>
+#include <stdio.h>
+#include <malloc.h>
+#include <stdlib.h>
+#include <string.h>
+#include "pagerank.h"
+
+
+int main ( int argc, char *argv[]) {
+	double d = atof(argv[1]);
+	double diffPR = atof(argv[2]);
+	int max = atoi(argv[3]);
+	LinkedList list = getCollection ("collection.txt");
+
+	Graph g = GetGraph(list);
+	showGraph(g, 1);
+	double *firstArr = (double *)malloc(sizeof(double)*(g->nV));
+	double *secondArr = (double *)malloc(sizeof(double)*(g->nV)); 	
+	double* urlPG = (double *)malloc(sizeof(double)*(g->nV)); 
+	fflush(stdout);
+	calculatePageRank (g, d, diffPR, max, firstArr, secondArr, urlPG);
+		
+
+	
+
+	insert(g, urlPG, list);
+	LinkedList sortedList = insertionsort (list);
+	printList (g, sortedList);
+	free(firstArr);
+	free(secondArr);
+	free(urlPG);
+	
+} 
+// insert information from array to list
+void insert(Graph g, double *arr, LinkedList list) {
+	int i = 0;
+	while (i < g->nV) {
+		list->pagerank = arr[i];
+		list->outgoing = outgoing (g, i);
+		list = list->next;
+		i++;
+	}
+	
+}
+// print list to .txt file
+void printList (Graph g, LinkedList list) {
+	FILE *fp = fopen ("pagerankList.txt", "w");
+	
+	while (list != NULL) {
+		fprintf(fp, "%s, 	%d,	   %.7f\n",list->url, list->outgoing, list->pagerank);
+		list = list->next;
+
+	}
+}
+
+void calculatePageRank(Graph g, double d, double diffPR, int maxIterations, double *firstArr, double *secondArr, double* urlPG) {
+	arrayInitializer (g, firstArr);
+	int iteration = 0;
+    double diff = diffPR; 
+	while (iteration < maxIterations && diff >= diffPR) {
+		int i = 0;
+		while (i < g->nV) {
+			double frac = (1 - d)/g->nV;
+			double prevPR= d *calculateSum(g, i, firstArr);
+			secondArr[i] = frac + prevPR;
+			i++;
+		}
+		diff = difference (g, firstArr, secondArr); 
+		arrayCopy (g, firstArr, secondArr); 
+		iteration++;
+	}
+	arrayCopy (g, urlPG, secondArr);
+
+}
+
+void arrayCopy (Graph g, double *first, double *second) {
+	int i = 0;
+	while (i < g-> nV) {
+		first[i] = second[i];
+		i++;
+	}
+}
+// calculates difference between each array cell
+double difference (Graph g, double *first, double *second) {
+	double sum = 0;
+	int i = 0;
+	while (i < g->nV) {
+		sum += fabs(second[i] - first[i]);
+		i++;
+	}
+	return sum;
+}
+	
+// calculate sum part of formula
+double calculateSum (Graph g , int v, double *arr) {
+	int i = 0;
+	double sum = 0;
+	while (i < g->nV) {
+		if (g->edges[i][v] == 1) {
+			double in = calculateWin (g, i, v);
+			double out = calculateWout (g, i, v);
+			sum += arr[i] * in * out;
+		}
+		i++;
+	}
+	return sum;
+} 
+				
+// initialize first iteration array to 1/N
+void arrayInitializer (Graph g, double *arr) {
+	int i = 0;
+	while (i < g->nV) {
+		arr[i] = (1/g->nV);
+		i++;
+	}
+}
+	
+
+double calculateWout (Graph g, int src, int dest) {
+	double destOut = 0;
+	double denominator = 0;
+	int v = src;
+	// loops through matrix representation and finds outgoing links from destination
+	int i = 0;	
+	while (i < g->nV) {
+		if (g->edges[v][i] == 1) {
+			double out = outgoing (g, i);
+			if (out == 0) {
+				out = 0.5;	
+			}
+			denominator += out;
+		}
+		i++;
+	}
+	int w = dest;
+	destOut = outgoing (g, w);
+	if (destOut == 0) {
+		destOut = 0.5;
+	}
+	return destOut/denominator;
+	
+}
+
+// calculate outgoin links
+double outgoing (Graph g, int i) {
+	int z = 0;
+	double out = 0;
+	while (z < g->nV) {
+		if (g->edges[i][z] == 1) {
+			out++;
+		}
+		z++;
+	}
+	return out;
+}
+
+
+double calculateWin (Graph g, int src, int dest) {
+	double destIn = 0;
+	double denominator = 0;	
+	int i = 0;
+	int v = src;
+	while (i < g->nV) {
+		if (g->edges[v][i] == 1) {
+			double in = incoming(g, i);
+			denominator += in;
+		}
+			
+		i++;
+	}
+	
+	int w = dest;
+	destIn = incoming (g, w);
+	if (destIn == 0) {
+		destIn = 0.5;
+	}
+	return destIn/denominator;	
+}
+// calculate incoming links
+double incoming (Graph g, int i) {
+	int z = 0;
+	double in = 0;
+	while (z < g->nV) {
+		if (g->edges[z][i] == 1) {
+			in++;
+		}
+		z++;
+	}
+	return in;
+}	
+
+// helper functions for sorting list
+LinkedList insertionsort  (LinkedList list) {
+
+	LinkedList oldcurr = list;
+	LinkedList newList = newLL();
+	while (oldcurr != NULL) {
+		LinkedList newNode = createNode(oldcurr->url);
+		newNode->pagerank = oldcurr->pagerank;
+		newNode->outgoing = oldcurr->outgoing;
+		newList = insertInOrder (newList, newNode);
+		oldcurr = oldcurr->next;
+	}
+	return newList;
+		
+}
+
+LinkedList insertInOrder (LinkedList list, LinkedList node) {
+
+	if (list == NULL) {
+		return node;
+	}
+	
+	if (node->pagerank > list->pagerank) {
+		node->next = list;
+		return node;
+	}
+	LinkedList curr = list;
+	LinkedList prev = NULL;
+
+	
+	while (curr != NULL && curr->pagerank > node->pagerank) {
+		prev = curr;
+		curr = curr->next;
+	}
+	
+	if (prev == NULL) {
+		 node->next = curr;
+		 return node;
+	} else {
+		prev->next = node;
+		node->next = curr;
+	}
+	
+	return list;
+}
+
